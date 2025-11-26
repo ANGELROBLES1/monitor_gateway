@@ -2,6 +2,10 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime
 
+@app.route("/")
+def home():
+    return "ESTE ES EL main.py CORRECTO 🚀", 200
+
 app = Flask(__name__)
 CORS(app)
 # ======== BASE DE DATOS EN RAM =========
@@ -94,4 +98,5 @@ def clear():
 # ======================================
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+
 
