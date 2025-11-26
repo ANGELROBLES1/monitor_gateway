@@ -1,13 +1,12 @@
+# Updated Flask app with embedded client-side editor (CodeMirror) to modify dashboard HTML
 from flask import Flask, request, jsonify, send_file, render_template_string
 import time
 
 app = Flask(__name__)
 
-data_buffer = []   # almacenamiento temporal
+data_buffer = []
 
-# ==============================
-# Página Web (Dashboard)
-# ==============================
+# Editable dashboard template stored in variable
 dashboard_html = """
 <!DOCTYPE html>
 <html>
@@ -16,60 +15,65 @@ dashboard_html = """
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- CodeMirror -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/xml/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/css/css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/htmlmixed/htmlmixed.min.js"></script>
 
     <style>
-        body {
-            font-family: Arial;
-            background: #eef5ee;
-            text-align: center;
-            padding: 20px;
-        }
-        h1 { color: #2e7d32; }
-        .chart-container {
-            width: 90%%;
-            max-width: 900px;
-            margin: auto;
-            background: white;
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            margin-bottom: 30px;
-        }
-        button {
-            background: #c62828;
-            color: white;
-            padding: 10px 18px;
-            font-size: 16px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-bottom: 20px;
-        }
-        button:hover { background: #8e0000; }
+        body { font-family: Arial; background: #eef5ee; padding: 20px; }
+        #editorPanel { margin-top: 20px; padding: 10px; background:white; border-radius: 10px; }
+        #saveBtn { background:#2e7d32; color:white; padding:10px; border:none; border-radius:5px; cursor:pointer; }
+        #saveBtn:hover { background:#1b5e20; }
     </style>
 </head>
 <body>
 
-    <h1>📡 Dashboard Ambiental - Gateway ESP32</h1>
+<h1>📡 Dashboard Ambiental</h1>
+<button onclick="borrarDatos()">Borrar Datos</button>
 
-    <button onclick="borrarDatos()">Borrar Datos</button>
+<div id="dashboardArea">
+    <h3>Temperatura</h3>
+    <canvas id="tempChart"></canvas>
 
-    <div class="chart-container">
-        <h3>Temperatura</h3>
-        <canvas id="tempChart"></canvas>
-    </div>
+    <h3>Humedad</h3>
+    <canvas id="humChart"></canvas>
 
-    <div class="chart-container">
-        <h3>Humedad</h3>
-        <canvas id="humChart"></canvas>
-    </div>
+    <h3>Gas</h3>
+    <canvas id="gasChart"></canvas>
+</div>
 
-    <div class="chart-container">
-        <h3>Gas</h3>
-        <canvas id="gasChart"></canvas>
-    </div>
+<hr>
+<h2>🛠 Editor Visual (Canva / CodeMirror)</h2>
+<p>Modifica el código del dashboard y guarda cambios sin tocar el archivo original.</p>
+
+<div id="editorPanel">
+<textarea id="editor" style="width:100%; height:300px;">{{ html_content }}</textarea>
+<br><br>
+<button id="saveBtn" onclick="guardarCambios()">Guardar Cambios</button>
+</div>
 
 <script>
+var editor = CodeMirror.fromTextArea(document.getElementById("editor"), {
+    lineNumbers: true,
+    mode: "htmlmixed",
+    theme: "default"
+});
+
+async function guardarCambios() {
+    const nuevoCodigo = editor.getValue();
+    await fetch('/update_dashboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ html: nuevoCodigo })
+    });
+    alert("Dashboard actualizado. Refresca la página.");
+}
+
 async function fetchData() {
     const res = await fetch('/datos');
     return await res.json();
@@ -82,7 +86,6 @@ async function borrarDatos() {
 
 async function actualizarGraficos() {
     const datos = await fetchData();
-
     const labels = datos.map(d => new Date(d.timestamp * 1000).toLocaleTimeString());
     const temp = datos.map(d => d.temperatura);
     const hum  = datos.map(d => d.humedad);
@@ -97,66 +100,42 @@ async function actualizarGraficos() {
     gasChart.data.labels = labels;
     gasChart.data.datasets[0].data = gas;
 
-    tempChart.update();
-    humChart.update();
-    gasChart.update();
+    tempChart.update(); humChart.update(); gasChart.update();
 }
 
-// ====== Gráficos ======
-const tempChart = new Chart(document.getElementById("tempChart"), {
-    type: "line",
-    data: { labels: [], datasets: [{ label: "°C", data: [], borderWidth: 2 }] },
-});
+const tempChart = new Chart(document.getElementById("tempChart"), { type: "line", data: { labels: [], datasets: [{ label: "°C", data: [], borderWidth: 2 }] } });
+const humChart  = new Chart(document.getElementById("humChart"),  { type: "line", data: { labels: [], datasets: [{ label: "%", data: [], borderWidth: 2 }] } });
+const gasChart  = new Chart(document.getElementById("gasChart"),  { type: "line", data: { labels: [], datasets: [{ label: "ppm", data: [], borderWidth: 2 }] } });
 
-const humChart = new Chart(document.getElementById("humChart"), {
-    type: "line",
-    data: { labels: [], datasets: [{ label: "%", data: [], borderWidth: 2 }] },
-});
-
-const gasChart = new Chart(document.getElementById("gasChart"), {
-    type: "line",
-    data: { labels: [], datasets: [{ label: "ppm", data: [], borderWidth: 2 }] },
-});
-
-// Actualizar cada 3 segundos
 setInterval(actualizarGraficos, 3000);
 </script>
-
 </body>
 </html>
 """
 
-# ==============================
-# Rutas para el Dashboard
-# ==============================
-
 @app.route("/")
 def home():
-    return render_template_string(dashboard_html)
+    return render_template_string(dashboard_html, html_content=dashboard_html)
 
-# ==============================
-# ESTE ES EL ENDPOINT QUE USA TU ESP32
-# ==============================
+@app.route("/update_dashboard", methods=["POST"])
+def update_dashboard():
+    global dashboard_html
+    content = request.get_json()
+    dashboard_html = content.get("html", dashboard_html)
+    return jsonify({"status": "updated"})
+
 @app.route("/data", methods=["POST"])
 def receive_data():
     content = request.get_json()
-
     if not content:
-        return jsonify({"status": "error", "reason": "payload vacío"}), 400
-
-    # Agregar timestamp
+        return jsonify({"status": "error"}), 400
     content["timestamp"] = time.time()
-
     data_buffer.append(content)
-
-    # Limitar tamaño
     if len(data_buffer) > 300:
         data_buffer.pop(0)
-
     return jsonify({"status": "ok"})
 
-# ==============================
-@app.route("/datos", methods=["GET"])
+@app.route("/datos")
 def send_data():
     return jsonify(data_buffer)
 
@@ -164,8 +143,6 @@ def send_data():
 def clear_data():
     data_buffer.clear()
     return jsonify({"status": "cleared"})
-
-# ==============================
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
