@@ -2,13 +2,22 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime
 
-@app.route("/")
-def home():
-    return "ESTE ES EL main.py CORRECTO 🚀", 200
-
+# -----------------------------------------------------
+# Inicializar Flask
+# -----------------------------------------------------
 app = Flask(__name__)
 CORS(app)
-# ======== BASE DE DATOS EN RAM =========
+
+# -----------------------------------------------------
+# Ruta inicial para probar que Flask está funcionando
+# -----------------------------------------------------
+@app.route("/")
+def home():
+    return "Servidor Flask funcionando 🚀", 200
+
+# -----------------------------------------------------
+# BASE DE DATOS EN MEMORIA
+# -----------------------------------------------------
 data_store = {
     "NodoA": {
         "temperatura": [],
@@ -22,12 +31,12 @@ data_store = {
     }
 }
 
-MAX_POINTS = 50   # Máximo de puntos para mantener historial limpio
+MAX_POINTS = 50  # Máximo historial
 
 
-# ======================================
-#   Endpoint para recibir datos del ESP32
-# ======================================
+# -----------------------------------------------------
+# Recibir datos desde el ESP32 (POST)
+# -----------------------------------------------------
 @app.route("/data", methods=["POST"])
 def receive_data():
     try:
@@ -40,7 +49,7 @@ def receive_data():
 
         now = datetime.now().strftime("%d/%m/%Y, %I:%M:%S %p")
 
-        # Nodo A
+        # ---- NODO A ----
         if node_id == "NodoA":
             temp = float(data.get("temperatura"))
             hum = float(data.get("humedad"))
@@ -53,7 +62,7 @@ def receive_data():
             data_store["NodoA"]["temperatura"] = data_store["NodoA"]["temperatura"][-MAX_POINTS:]
             data_store["NodoA"]["humedad"] = data_store["NodoA"]["humedad"][-MAX_POINTS:]
 
-        # Nodo B
+        # ---- NODO B ----
         elif node_id == "NodoB":
             temp = float(data.get("temperatura"))
             gas = float(data.get("gas"))
@@ -72,17 +81,17 @@ def receive_data():
         return jsonify({"error": str(e)}), 400
 
 
-# ======================================
-#   Endpoint para enviar datos al Dashboard
-# ======================================
+# -----------------------------------------------------
+# Enviar datos al Dashboard (GET)
+# -----------------------------------------------------
 @app.route("/data", methods=["GET"])
 def send_data():
     return jsonify(data_store)
 
 
-# ======================================
-#          BORRAR DATOS
-# ======================================
+# -----------------------------------------------------
+# Borrar datos del historial
+# -----------------------------------------------------
 @app.route("/clear", methods=["POST"])
 def clear():
     for node in data_store.values():
@@ -90,13 +99,13 @@ def clear():
             if isinstance(node[key], list):
                 node[key].clear()
         node["timestamp"] = None
+
     return jsonify({"status": "cleared"})
 
 
-# ======================================
-#             RUN SERVER
-# ======================================
+# -----------------------------------------------------
+# Ejecutar servidor localmente
+# (Render ignora esta línea porque usa Gunicorn)
+# -----------------------------------------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
-
-
