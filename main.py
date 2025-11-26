@@ -1,5 +1,4 @@
-from flask import Flask, request, jsonify, send_file
-from flask import render_template_string
+from flask import Flask, request, jsonify, send_file, render_template_string
 import time
 
 app = Flask(__name__)
@@ -87,7 +86,7 @@ async function actualizarGraficos() {
     const labels = datos.map(d => new Date(d.timestamp * 1000).toLocaleTimeString());
     const temp = datos.map(d => d.temperatura);
     const hum  = datos.map(d => d.humedad);
-    const gas  = datos.map(d => d.gas);
+    const gas  = datos.map(d => d.gas ?? 0);
 
     tempChart.data.labels = labels;
     tempChart.data.datasets[0].data = temp;
@@ -128,31 +127,35 @@ setInterval(actualizarGraficos, 3000);
 """
 
 # ==============================
-# Rutas para la API
+# Rutas para el Dashboard
 # ==============================
 
 @app.route("/")
 def home():
     return render_template_string(dashboard_html)
 
-@app.route("/api/data", methods=["POST"])
+# ==============================
+# ESTE ES EL ENDPOINT QUE USA TU ESP32
+# ==============================
+@app.route("/data", methods=["POST"])
 def receive_data():
     content = request.get_json()
 
-    if not content or "id" not in content:
-        return jsonify({"status": "error", "reason": "payload inválido"}), 400
+    if not content:
+        return jsonify({"status": "error", "reason": "payload vacío"}), 400
 
-    # se agrega timestamp
+    # Agregar timestamp
     content["timestamp"] = time.time()
 
     data_buffer.append(content)
 
-    # limitar tamaño
+    # Limitar tamaño
     if len(data_buffer) > 300:
         data_buffer.pop(0)
 
     return jsonify({"status": "ok"})
 
+# ==============================
 @app.route("/datos", methods=["GET"])
 def send_data():
     return jsonify(data_buffer)
