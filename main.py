@@ -37,51 +37,50 @@ dashboard_html = """
 <button onclick="borrarDatos()">Borrar Datos</button>
 
 <div id="dashboardArea">
+    <style>
+        .chart-wrapper { position: relative; width: 100%; height: 350px; margin-bottom: 40px; }
+        .alert-overlay {
+            position: absolute;
+            top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(255,0,0,0.8);
+            color:white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 22px;
+            font-weight: bold;
+            display:none;
+            z-index:10;
+        }
+    </style>
+
     <h3>Temperatura</h3>
-    <canvas id="tempChart"></canvas>
+    <div class="chart-wrapper">
+        <div id="alertTemp" class="alert-overlay">⚠ Nivel crítico</div>
+        <canvas id="tempChart"></canvas>
+    </div>
 
     <h3>Humedad</h3>
-    <canvas id="humChart"></canvas>
+    <div class="chart-wrapper">
+        <div id="alertHum" class="alert-overlay">⚠ Nivel crítico</div>
+        <canvas id="humChart"></canvas>
+    </div>
 
     <h3>Gas</h3>
-    <canvas id="gasChart"></canvas>
-</div>
-
-<hr>
-<h2>🛠 Editor Visual (Canva / CodeMirror)</h2>
-<p>Modifica el código del dashboard y guarda cambios sin tocar el archivo original.</p>
-
-<div id="editorPanel">
-<textarea id="editor" style="width:100%; height:300px;">{{ html_content }}</textarea>
-<br><br>
-<button id="saveBtn" onclick="guardarCambios()">Guardar Cambios</button>
+    <div class="chart-wrapper">
+        <div id="alertGas" class="alert-overlay">⚠ Nivel crítico</div>
+        <canvas id="gasChart"></canvas>
+    </div>
 </div>
 
 <script>
-var editor = CodeMirror.fromTextArea(document.getElementById("editor"), {
-    lineNumbers: true,
-    mode: "htmlmixed",
-    theme: "default"
-});
+var critTempHigh = 30, critTempLow = 10;
+var critHumHigh  = 80, critHumLow  = 20;
+var critGasHigh  = 300, critGasLow = 50;
 
-async function guardarCambios() {
-    const nuevoCodigo = editor.getValue();
-    await fetch('/update_dashboard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ html: nuevoCodigo })
-    });
-    alert("Dashboard actualizado. Refresca la página.");
-}
-
-async function fetchData() {
-    const res = await fetch('/datos');
-    return await res.json();
-}
-
-async function borrarDatos() {
-    await fetch('/clear', { method: "POST" });
-    alert("Datos borrados");
+function checkAlerts(values, alertBox, low, high){
+    const last = values[values.length-1];
+    if(last > high || last < low){ alertBox.style.display="block"; }
+    else{ alertBox.style.display="none"; }
 }
 
 async function actualizarGraficos() {
@@ -93,19 +92,21 @@ async function actualizarGraficos() {
 
     tempChart.data.labels = labels;
     tempChart.data.datasets[0].data = temp;
-
     humChart.data.labels = labels;
     humChart.data.datasets[0].data = hum;
-
     gasChart.data.labels = labels;
     gasChart.data.datasets[0].data = gas;
 
     tempChart.update(); humChart.update(); gasChart.update();
+
+    checkAlerts(temp, document.getElementById('alertTemp'), critTempLow, critTempHigh);
+    checkAlerts(hum, document.getElementById('alertHum'), critHumLow, critHumHigh);
+    checkAlerts(gas, document.getElementById('alertGas'), critGasLow, critGasHigh);
 }
 
-const tempChart = new Chart(document.getElementById("tempChart"), { type: "line", data: { labels: [], datasets: [{ label: "°C", data: [], borderWidth: 2 }] } });
-const humChart  = new Chart(document.getElementById("humChart"),  { type: "line", data: { labels: [], datasets: [{ label: "%", data: [], borderWidth: 2 }] } });
-const gasChart  = new Chart(document.getElementById("gasChart"),  { type: "line", data: { labels: [], datasets: [{ label: "ppm", data: [], borderWidth: 2 }] } });
+const tempChart = new Chart(document.getElementById("tempChart"), { type: "line", options:{responsive:true,maintainAspectRatio:false}, data: { labels: [], datasets: [{ label: "°C", data: [], borderWidth: 2 }] }});
+const humChart  = new Chart(document.getElementById("humChart"),  { type: "line", options:{responsive:true,maintainAspectRatio:false}, data: { labels: [], datasets: [{ label: "%", data: [], borderWidth: 2 }] }});
+const gasChart  = new Chart(document.getElementById("gasChart"),  { type: "line", options:{responsive:true,maintainAspectRatio:false}, data: { labels: [], datasets: [{ label: "ppm", data: [], borderWidth: 2 }] }});
 
 setInterval(actualizarGraficos, 3000);
 </script>
