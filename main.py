@@ -250,6 +250,60 @@ async function fetchNow(){ await actualizarGraficos(); }
 actualizarGraficos();
 setInterval(actualizarGraficos, 3000);
 </script>
+<!-- ===================================================== -->
+<!--  EDITOR VISUAL (CodeMirror)  -->
+<!-- ===================================================== -->
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+
+<style>
+#editor-panel {
+    width: 90%;
+    max-width: 900px;
+    margin: 30px auto;
+    padding: 15px;
+    background: #1e1e1e;
+    border-radius: 10px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+    color: white;
+}
+#saveBtn {
+    margin-top: 10px;
+    padding: 10px 25px;
+    background: #4CAF50;
+    border: none;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+}
+</style>
+
+<div id="editor-panel">
+    <h3>Editor del Código del Dashboard</h3>
+    <textarea id="editorArea">{{ code_content }}</textarea>
+    <button id="saveBtn">Guardar cambios</button>
+</div>
+
+<script>
+var editor = CodeMirror.fromTextArea(document.getElementById("editorArea"), {
+    lineNumbers: true,
+    mode: "python",
+    theme: "material-darker",
+    tabSize: 4
+});
+
+document.getElementById("saveBtn").onclick = function () {
+    fetch("/save_code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json"},
+        body: JSON.stringify({ code: editor.getValue() })
+    }).then(r => alert("Código actualizado correctamente"));
+};
+</script>
+
 </body>
 </html>
 """
@@ -284,3 +338,4 @@ def clear_data():
 if __name__ == "__main__":
     # host 0.0.0.0 para acceso desde otros dispositivos en la misma red (ESP32/phone)
     app.run(host="0.0.0.0", port=10000, debug=True)
+
