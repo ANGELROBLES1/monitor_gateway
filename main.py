@@ -1,16 +1,12 @@
 from flask import Flask, request, jsonify, render_template_string
 import time
-import requests
 import random
 
 app = Flask(__name__)
 
 data_buffer = []
 
-
-# ===========================
 # HTML COMPLETO DEL DASHBOARD
-# ===========================
 dashboard_html = """
 <!DOCTYPE html>
 <html>
@@ -28,7 +24,7 @@ dashboard_html = """
 <style>
 body {
     font-family: Arial, sans-serif;
-    background: #eef5ee;
+    background: #e9f1ea;
     margin: 0;
     padding: 0;
 }
@@ -40,11 +36,13 @@ body {
 h1 {
     color: #2e7d32;
     font-size: 22px;
+    margin-bottom: 5px;
 }
 header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding-bottom: 10px;
 }
 .btn {
     background: #c62828;
@@ -80,13 +78,14 @@ header {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: rgba(255,0,0,0.9);
-    padding: 12px 20px;
+    background: rgba(200,0,0,0.92);
+    padding: 10px 16px;
     color: white;
-    font-weight: 700;
+    font-weight: bold;
     border-radius: 10px;
     display: none;
     z-index: 20;
+    font-size: 18px;
 }
 .settings {
     display: flex;
@@ -103,26 +102,8 @@ input[type="number"] {
     border-radius: 6px;
     border: 1px solid #ccc;
 }
-#editor-panel {
-    width: 90%;
-    max-width: 900px;
-    margin: 40px auto;
-    background: #1e1e1e;
-    padding: 15px;
-    border-radius: 10px;
-    color: white;
-}
-#saveBtn {
-    margin-top: 10px;
-    padding: 10px 25px;
-    background: #4CAF50;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    color: white;
-}
 
-/* Mapa (Mejora 1 y 2) */
+/* Mapa */
 #map {
     height: 400px;
     width: 100%;
@@ -132,7 +113,6 @@ input[type="number"] {
 }
 </style>
 
-<!-- Leaflet para mapa -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
@@ -148,9 +128,7 @@ input[type="number"] {
     </div>
 </header>
 
-<!-- ========================================= -->
-<!-- MEJORA 1 Y 2: MAPA CON NODOS Y GEOLOCALIZACION -->
-<!-- ========================================= -->
+<!-- MAPA CON NODOS -->
 <div class="card">
     <h2>Mapa de Nodos</h2>
     <div id="map"></div>
@@ -158,7 +136,7 @@ input[type="number"] {
 
 <!-- TEMPERATURA -->
 <div class="card">
-    <div class="chart-title">Temperatura (C)</div>
+    <div class="chart-title">Temperatura C</div>
     <div class="chart-wrapper">
         <div id="alertTemp" class="alert-overlay">Temperatura critica</div>
         <canvas id="tempChart"></canvas>
@@ -171,7 +149,7 @@ input[type="number"] {
 
 <!-- HUMEDAD -->
 <div class="card">
-    <div class="chart-title">Humedad (%)</div>
+    <div class="chart-title">Humedad %</div>
     <div class="chart-wrapper">
         <div id="alertHum" class="alert-overlay">Humedad critica</div>
         <canvas id="humChart"></canvas>
@@ -184,7 +162,7 @@ input[type="number"] {
 
 <!-- GAS -->
 <div class="card">
-    <div class="chart-title">Gas (ppm)</div>
+    <div class="chart-title">Gas ppm</div>
     <div class="chart-wrapper">
         <div id="alertGas" class="alert-overlay">Gas critico</div>
         <canvas id="gasChart"></canvas>
@@ -277,9 +255,7 @@ async function fetchNow(){ actualizarGraficos(); }
 actualizarGraficos();
 setInterval(actualizarGraficos, 3000);
 
-// ===========================
-// MAPA LEAFLET (Mejora 1 y 2)
-// ===========================
+// MAPA LEAFLET
 var map = L.map('map').setView([4.661944, -74.058583], 17);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
 
@@ -307,9 +283,7 @@ cargarNodos();
 </html>
 """
 
-# =====================================================
-# API BACKEND
-# =====================================================
+# BACKEND
 
 @app.route("/")
 def home():
@@ -346,4 +320,3 @@ def nodos():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000, debug=True)
-
