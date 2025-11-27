@@ -252,6 +252,48 @@ input[type="number"] {
 </div>
 
 </div>
+// -----------------------------------------------------
+// 🆕 ALERTAS DE NODOS DESCONECTADOS EN TIEMPO REAL
+// -----------------------------------------------------
+async function revisarEstadoNodos(){
+    const res = await fetch("/estado_nodos");
+    const estados = await res.json();
+
+    let mensaje = "";
+
+    for(const id in estados){
+        if(estados[id] !== "OK"){
+            mensaje += `❌ ${id} desconectado<br>`;
+        }
+    }
+
+    let alerta = document.getElementById("alertaNodos");
+    if(!alerta){
+        alerta = document.createElement("div");
+        alerta.id = "alertaNodos";
+        alerta.style.position = "fixed";
+        alerta.style.bottom = "20px";
+        alerta.style.right = "20px";
+        alerta.style.background = "#b71c1c";
+        alerta.style.color = "white";
+        alerta.style.padding = "12px 18px";
+        alerta.style.borderRadius = "10px";
+        alerta.style.fontSize = "16px";
+        alerta.style.display = "none";
+        alerta.style.zIndex = "9999";
+        document.body.appendChild(alerta);
+    }
+
+    if(mensaje !== ""){
+        alerta.innerHTML = mensaje;
+        alerta.style.display = "block";
+    } else {
+        alerta.style.display = "none";
+    }
+}
+
+// checar cada 3 seg
+setInterval(revisarEstadoNodos, 3000);
 
 <script>
 async function fetchDatos(){
@@ -417,3 +459,4 @@ def nodos():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000, debug=True)
+
