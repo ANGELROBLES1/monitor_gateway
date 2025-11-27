@@ -7,7 +7,6 @@ app = Flask(__name__)
 
 data_buffer = []
 
-# Cargar el propio archivo main.py para mostrar en el editor
 def load_self_code():
     try:
         with open(__file__, "r") as f:
@@ -15,7 +14,6 @@ def load_self_code():
     except:
         return "No se pudo cargar el codigo"
 
-# HTML COMPLETO DEL DASHBOARD
 dashboard_html = """
 <!DOCTYPE html>
 <html>
@@ -26,7 +24,6 @@ dashboard_html = """
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<!-- CodeMirror -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
@@ -114,7 +111,6 @@ input[type="number"] {
     border: 1px solid #ccc;
 }
 
-/* Mapa */
 #map {
     height: 400px;
     width: 100%;
@@ -123,7 +119,6 @@ input[type="number"] {
     box-shadow: 0 6px 20px rgba(0,0,0,0.15);
 }
 
-/* Editor */
 #editor-panel {
     width: 95%;
     margin: 40px auto;
@@ -131,10 +126,51 @@ input[type="number"] {
     padding: 15px;
     border-radius: 10px;
     color: white;
+    position: relative;
 }
+
 #editor {
     height: 400px;
+    filter: blur(7px);
+    pointer-events: none;
 }
+
+#lockOverlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 460px;
+    background: rgba(0,0,0,0.65);
+    backdrop-filter: blur(2px);
+    border-radius: 10px;
+    z-index: 50;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    color: white;
+}
+
+#unlockInput {
+    padding: 10px;
+    font-size: 16px;
+    border-radius: 6px;
+    border: none;
+    width: 200px;
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+#unlockBtn {
+    padding: 8px 16px;
+    background: #4caf50;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    color: white;
+}
+
 #saveBtn {
     margin-top: 12px;
     padding: 10px 20px;
@@ -146,7 +182,6 @@ input[type="number"] {
 }
 </style>
 
-<!-- Leaflet -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
@@ -162,13 +197,11 @@ input[type="number"] {
     </div>
 </header>
 
-<!-- MAPA -->
 <div class="card">
     <h2>Mapa de Nodos</h2>
     <div id="map"></div>
 </div>
 
-<!-- TEMPERATURA -->
 <div class="card">
     <div class="chart-title">Temperatura C</div>
     <div class="chart-wrapper">
@@ -181,7 +214,6 @@ input[type="number"] {
     </div>
 </div>
 
-<!-- HUMEDAD -->
 <div class="card">
     <div class="chart-title">Humedad %</div>
     <div class="chart-wrapper">
@@ -194,7 +226,6 @@ input[type="number"] {
     </div>
 </div>
 
-<!-- GAS -->
 <div class="card">
     <div class="chart-title">Gas ppm</div>
     <div class="chart-wrapper">
@@ -207,9 +238,15 @@ input[type="number"] {
     </div>
 </div>
 
-<!-- PANEL DE EDICION -->
 <div id="editor-panel">
     <h2>Editor de Codigo</h2>
+
+    <div id="lockOverlay">
+        <p>Editor bloqueado</p>
+        <input id="unlockInput" placeholder="Clave" type="password">
+        <button id="unlockBtn" onclick="unlockEditor()">Desbloquear</button>
+    </div>
+
     <textarea id="editor">{{ code_content }}</textarea>
     <button id="saveBtn" onclick="saveEditor()">Guardar</button>
 </div>
@@ -296,7 +333,6 @@ async function fetchNow(){ actualizarGraficos(); }
 actualizarGraficos();
 setInterval(actualizarGraficos, 3000);
 
-// MAPA LEAFLET
 var map = L.map('map').setView([4.661944, -74.058583], 17);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
 
@@ -319,23 +355,32 @@ async function cargarNodos(){
 
 cargarNodos();
 
-// EDITOR CODEMIRROR
 var editor = CodeMirror.fromTextArea(document.getElementById("editor"), {
     lineNumbers: true,
     mode: "python",
     theme: "material-darker"
 });
 
+function unlockEditor(){
+    const key = document.getElementById("unlockInput").value;
+    if(key === "redes123"){
+        document.getElementById("editor").style.filter = "none";
+        document.getElementById("editor").style.pointerEvents = "auto";
+        document.getElementById("lockOverlay").style.display = "none";
+        editor.setOption("readOnly", false);
+    } else {
+        alert("Clave incorrecta");
+    }
+}
+
 function saveEditor(){
-    alert("El codigo fue actualizado en pantalla pero no se puede sobrescribir el archivo en el servidor por seguridad.");
+    alert("El codigo fue actualizado en pantalla pero no se puede sobrescribir el archivo en el servidor.");
 }
 </script>
 
 </body>
 </html>
 """
-
-# BACKEND
 
 @app.route("/")
 def home():
