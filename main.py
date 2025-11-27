@@ -1,10 +1,19 @@
 from flask import Flask, request, jsonify, render_template_string
 import time
 import random
+import os
 
 app = Flask(__name__)
 
 data_buffer = []
+
+# Cargar el propio archivo main.py para mostrar en el editor
+def load_self_code():
+    try:
+        with open(__file__, "r") as f:
+            return f.read()
+    except:
+        return "No se pudo cargar el codigo"
 
 # HTML COMPLETO DEL DASHBOARD
 dashboard_html = """
@@ -16,6 +25,8 @@ dashboard_html = """
 <title>Dashboard Ambiental</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- CodeMirror -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
@@ -111,8 +122,31 @@ input[type="number"] {
     margin-top: 20px;
     box-shadow: 0 6px 20px rgba(0,0,0,0.15);
 }
+
+/* Editor */
+#editor-panel {
+    width: 95%;
+    margin: 40px auto;
+    background: #1e1e1e;
+    padding: 15px;
+    border-radius: 10px;
+    color: white;
+}
+#editor {
+    height: 400px;
+}
+#saveBtn {
+    margin-top: 12px;
+    padding: 10px 20px;
+    background: #4CAF50;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    color: white;
+}
 </style>
 
+<!-- Leaflet -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
@@ -128,7 +162,7 @@ input[type="number"] {
     </div>
 </header>
 
-<!-- MAPA CON NODOS -->
+<!-- MAPA -->
 <div class="card">
     <h2>Mapa de Nodos</h2>
     <div id="map"></div>
@@ -171,6 +205,13 @@ input[type="number"] {
         <label>Umbral bajo <input id="gasLow" type="number" value="50"></label>
         <label>Umbral alto <input id="gasHigh" type="number" value="300"></label>
     </div>
+</div>
+
+<!-- PANEL DE EDICION -->
+<div id="editor-panel">
+    <h2>Editor de Codigo</h2>
+    <textarea id="editor">{{ code_content }}</textarea>
+    <button id="saveBtn" onclick="saveEditor()">Guardar</button>
 </div>
 
 </div>
@@ -277,6 +318,17 @@ async function cargarNodos(){
 }
 
 cargarNodos();
+
+// EDITOR CODEMIRROR
+var editor = CodeMirror.fromTextArea(document.getElementById("editor"), {
+    lineNumbers: true,
+    mode: "python",
+    theme: "material-darker"
+});
+
+function saveEditor(){
+    alert("El codigo fue actualizado en pantalla pero no se puede sobrescribir el archivo en el servidor por seguridad.");
+}
 </script>
 
 </body>
@@ -287,7 +339,7 @@ cargarNodos();
 
 @app.route("/")
 def home():
-    return render_template_string(dashboard_html, code_content=open(__file__).read())
+    return render_template_string(dashboard_html, code_content=load_self_code())
 
 @app.route("/data", methods=["POST"])
 def receive_data():
