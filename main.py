@@ -1,214 +1,347 @@
+from flask import Flask, request, jsonify, render_template_string
+import time
+import requests
+import random
+
+app = Flask(__name__)
+
+data_buffer = []
+
+# ===========================
+# HTML COMPLETO DEL DASHBOARD
+# ===========================
+dashboard_html = """
 <!DOCTYPE html>
 <html>
-
 <head>
-    <title>Dashboard agricola</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Ambiental</title>
 
-    <style>
-        body {
-            margin: 0;
-            font-family: Arial;
-            background: #f4f4f4;
-        }
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
 
-        .container {
-            width: 95%;
-            margin: auto;
-            padding-top: 20px;
-        }
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #eef5ee;
+    margin: 0;
+    padding: 0;
+}
+.container {
+    max-width: 1200px;
+    margin: 20px auto;
+    padding: 10px;
+}
+h1 {
+    color: #2e7d32;
+    font-size: 22px;
+}
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.btn {
+    background: #c62828;
+    color: white;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+.btn.secondary {
+    background: #2e7d32;
+}
+.card {
+    background: white;
+    border-radius: 12px;
+    padding: 18px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+    margin-bottom: 24px;
+}
+.chart-wrapper {
+    position: relative;
+    width: 100%;
+    height: 360px;
+}
+.chart-title {
+    font-size: 20px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 10px;
+}
+.alert-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(255,0,0,0.9);
+    padding: 12px 20px;
+    color: white;
+    font-weight: 700;
+    border-radius: 10px;
+    display: none;
+    z-index: 20;
+}
+.settings {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 10px;
+}
+.settings label {
+    font-size: 13px;
+}
+input[type="number"] {
+    width: 80px;
+    padding: 6px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+}
+#editor-panel {
+    width: 90%;
+    max-width: 900px;
+    margin: 40px auto;
+    background: #1e1e1e;
+    padding: 15px;
+    border-radius: 10px;
+    color: white;
+}
+#saveBtn {
+    margin-top: 10px;
+    padding: 10px 25px;
+    background: #4CAF50;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    color: white;
+}
 
-        .card {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 8px #ccc;
-            margin-bottom: 25px;
-        }
+/* Mapa (Mejora 1 y 2) */
+#map {
+    height: 400px;
+    width: 100%;
+    border-radius: 12px;
+    margin-top: 20px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+}
+</style>
 
-        h2 {
-            margin-top: 0;
-        }
-
-        #map {
-            height: 420px;
-            width: 100%;
-            border-radius: 6px;
-        }
-
-        .node-card {
-            border: 1px solid #ddd;
-            padding: 12px;
-            margin-bottom: 10px;
-            border-radius: 6px;
-        }
-
-        .alerta {
-            background: #ffdddd;
-            color: #900;
-            padding: 10px;
-            border-radius: 4px;
-            font-weight: bold;
-        }
-
-        .cultivo-box {
-            background: #eef2ff;
-            padding: 15px;
-            border-radius: 6px;
-        }
-    </style>
-
-    <!-- Leaflet CDN -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Leaflet para mapa -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 </head>
-
 <body>
 
-    <div class="container">
-
-        <!-- MAPA GPS -->
-        <div class="card">
-            <h2>Ubicacion del cultivo</h2>
-            <div id="map"></div>
-        </div>
-
-        <!-- CLIMA ACTUAL -->
-        <div class="card">
-            <h2>Clima actual</h2>
-            <div id="clima-box">Cargando clima...</div>
-        </div>
-
-        <!-- PANEL DE NODOS -->
-        <div class="card">
-            <h2>Estado de nodos</h2>
-            <div id="nodos-box"></div>
-        </div>
-
-        <!-- MODO CULTIVO -->
-        <div class="card">
-            <h2>Seleccion de cultivo</h2>
-
-            <select id="cultivo-select">
-                {% for c in cultivos %}
-                <option value="{{c}}">{{c}}</option>
-                {% endfor %}
-            </select>
-
-            <div id="cultivo-info" class="cultivo-box" style="margin-top: 15px;">
-                Selecciona un cultivo para ver recomendaciones
-            </div>
-        </div>
-
+<div class="container">
+<header>
+    <h1>Dashboard Ambiental</h1>
+    <div>
+        <button class="btn" onclick="clearData()">Borrar datos</button>
+        <button class="btn secondary" onclick="fetchNow()">Actualizar</button>
     </div>
+</header>
 
-    <script>
-        // =========================
-        // MAPA
-        // =========================
+<!-- ========================================= -->
+<!-- MEJORA 1 Y 2: MAPA CON NODOS Y GEOLOCALIZACION -->
+<!-- ========================================= -->
+<div class="card">
+    <h2>Mapa de Nodos</h2>
+    <div id="map"></div>
+</div>
 
-        var map = L.map('map').setView([4.661944, -74.058583], 17);
+<!-- TEMPERATURA -->
+<div class="card">
+    <div class="chart-title">Temperatura (C)</div>
+    <div class="chart-wrapper">
+        <div id="alertTemp" class="alert-overlay">Temperatura critica</div>
+        <canvas id="tempChart"></canvas>
+    </div>
+    <div class="settings">
+        <label>Umbral bajo <input id="tempLow" type="number" value="10"></label>
+        <label>Umbral alto <input id="tempHigh" type="number" value="30"></label>
+    </div>
+</div>
 
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19
-        }).addTo(map);
+<!-- HUMEDAD -->
+<div class="card">
+    <div class="chart-title">Humedad (%)</div>
+    <div class="chart-wrapper">
+        <div id="alertHum" class="alert-overlay">Humedad critica</div>
+        <canvas id="humChart"></canvas>
+    </div>
+    <div class="settings">
+        <label>Umbral bajo <input id="humLow" type="number" value="20"></label>
+        <label>Umbral alto <input id="humHigh" type="number" value="80"></label>
+    </div>
+</div>
 
-        function cargarNodos() {
-            fetch("/api/nodos")
-                .then(r => r.json())
-                .then(nodos => {
+<!-- GAS -->
+<div class="card">
+    <div class="chart-title">Gas (ppm)</div>
+    <div class="chart-wrapper">
+        <div id="alertGas" class="alert-overlay">Gas critico</div>
+        <canvas id="gasChart"></canvas>
+    </div>
+    <div class="settings">
+        <label>Umbral bajo <input id="gasLow" type="number" value="50"></label>
+        <label>Umbral alto <input id="gasHigh" type="number" value="300"></label>
+    </div>
+</div>
 
-                    nodos.forEach(n => {
-                        var color = n.estado == "OK" ? "green" : "red";
+</div>
 
-                        var marker = L.circleMarker([n.lat, n.lng], {
-                            radius: 10,
-                            color: color,
-                            fillColor: color,
-                            fillOpacity: 0.8
-                        }).addTo(map);
+<script>
+async function fetchDatos(){
+    try{
+        const res = await fetch('/datos');
+        if(!res.ok) return [];
+        return await res.json();
+    }catch(e){
+        return [];
+    }
+}
 
-                        marker.bindPopup(
-                            "<b>" + n.id + "</b><br>" +
-                            "Variable: " + n.variable + "<br>" +
-                            "Bateria: " + n.bateria + "%<br>" +
-                            "Senal: " + n.senal + " dBm<br>" +
-                            "Ultimo reporte: " + n.ultimo_reporte + "<br>" +
-                            "Estado: " + n.estado
-                        );
-                    });
-                });
-        }
+function checkAlert(values, low, high){
+    if(values.length === 0) return false;
+    const last = values[values.length - 1];
+    return (last > high || last < low);
+}
 
-        cargarNodos();
+function makeConfig(label){
+    return {
+        type: 'line',
+        data: { labels: [], datasets:[{ label: label, data: [], borderWidth: 2 }] },
+        options: { responsive:true, maintainAspectRatio:false }
+    };
+}
 
-        // =========================
-        // CLIMA
-        // =========================
+const tempCtx = document.getElementById("tempChart").getContext("2d");
+const humCtx  = document.getElementById("humChart").getContext("2d");
+const gasCtx  = document.getElementById("gasChart").getContext("2d");
 
-        function cargarClima() {
-            fetch("/api/clima")
-                .then(r => r.json())
-                .then(c => {
-                    document.getElementById("clima-box").innerHTML =
-                        "<b>Temperatura:</b> " + c.temperature_2m + " C<br>" +
-                        "<b>Humedad:</b> " + c.relative_humidity_2m + " %<br>" +
-                        "<b>Viento:</b> " + c.wind_speed_10m + " m/s<br>" +
-                        "<b>Codigo de clima:</b> " + c.weather_code;
-                });
-        }
+const tempChart = new Chart(tempCtx, makeConfig("C"));
+const humChart  = new Chart(humCtx,  makeConfig("%"));
+const gasChart  = new Chart(gasCtx,  makeConfig("ppm"));
 
-        cargarClima();
+async function actualizarGraficos(){
+    const datos = await fetchDatos();
 
-        // =========================
-        // NODOS
-        // =========================
+    if(datos.length === 0){
+        tempChart.data.labels = [];
+        humChart.data.labels = [];
+        gasChart.data.labels = [];
+        tempChart.update(); humChart.update(); gasChart.update();
+        return;
+    }
 
-        function cargarPanelNodos() {
-            fetch("/api/nodos")
-                .then(r => r.json())
-                .then(nodos => {
-                    let out = "";
+    const labels = datos.map(d => new Date(d.timestamp * 1000).toLocaleTimeString());
+    const temp = datos.map(d => d.temperatura);
+    const hum = datos.map(d => d.humedad);
+    const gas = datos.map(d => d.gas);
 
-                    nodos.forEach(n => {
-                        out += `
-                            <div class='node-card'>
-                                <b>${n.id}</b><br>
-                                Variable: ${n.variable}<br>
-                                Bateria: ${n.bateria}%<br>
-                                Senal: ${n.senal} dBm<br>
-                                Ultimo reporte: ${n.ultimo_reporte}<br>
-                                Estado: ${n.estado}
-                            </div>
-                        `;
-                    });
+    tempChart.data.labels = labels;
+    tempChart.data.datasets[0].data = temp;
+    humChart.data.labels = labels;
+    humChart.data.datasets[0].data = hum;
+    gasChart.data.labels = labels;
+    gasChart.data.datasets[0].data = gas;
 
-                    document.getElementById("nodos-box").innerHTML = out;
-                });
-        }
+    tempChart.update(); humChart.update(); gasChart.update();
 
-        cargarPanelNodos();
+    const tLow = Number(document.getElementById("tempLow").value);
+    const tHigh = Number(document.getElementById("tempHigh").value);
+    const hLow = Number(document.getElementById("humLow").value);
+    const hHigh = Number(document.getElementById("humHigh").value);
+    const gLow = Number(document.getElementById("gasLow").value);
+    const gHigh = Number(document.getElementById("gasHigh").value);
 
-        // =========================
-        // CULTIVO - RECOMENDACIONES
-        // =========================
+    document.getElementById("alertTemp").style.display = checkAlert(temp, tLow, tHigh) ? "block" : "none";
+    document.getElementById("alertHum").style.display = checkAlert(hum, hLow, hHigh) ? "block" : "none";
+    document.getElementById("alertGas").style.display = checkAlert(gas, gLow, gHigh) ? "block" : "none";
+}
 
-        document.getElementById("cultivo-select").addEventListener("change", function () {
-            let c = this.value;
+async function clearData(){
+    await fetch('/clear', { method:'POST' });
+    await actualizarGraficos();
+}
 
-            fetch("/api/cultivo/" + c)
-                .then(r => r.json())
-                .then(info => {
-                    document.getElementById("cultivo-info").innerHTML =
-                        "<b>Humedad ideal:</b> " + info.humedad_min + " - " + info.humedad_max + "<br>" +
-                        "<b>Temperatura ideal:</b> " + info.temp_min + " - " + info.temp_max + "<br>" +
-                        "<b>Riego:</b> " + info.riego + "<br>" +
-                        "<b>Notas:</b> " + info.notas;
-                });
-        });
+async function fetchNow(){ actualizarGraficos(); }
 
-    </script>
+actualizarGraficos();
+setInterval(actualizarGraficos, 3000);
+
+// ===========================
+// MAPA LEAFLET (Mejora 1 y 2)
+// ===========================
+var map = L.map('map').setView([4.661944, -74.058583], 17);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
+
+async function cargarNodos(){
+    const res = await fetch("/nodos");
+    const nodos = await res.json();
+
+    nodos.forEach(n => {
+        L.marker([n.lat, n.lng])
+        .addTo(map)
+        .bindPopup(
+            "<b>" + n.id + "</b><br>" +
+            "Variable: " + n.variable + "<br>" +
+            "Bateria: " + n.bateria + "%<br>" +
+            "Senal: " + n.senal + " dBm<br>" +
+            "Estado: " + n.estado
+        );
+    });
+}
+
+cargarNodos();
+</script>
 
 </body>
-
 </html>
+"""
+
+# =====================================================
+# API BACKEND
+# =====================================================
+
+@app.route("/")
+def home():
+    return render_template_string(dashboard_html, code_content=open(__file__).read())
+
+@app.route("/data", methods=["POST"])
+def receive_data():
+    d = request.get_json()
+    if not d:
+        return jsonify({"status":"error"}), 400
+    d["timestamp"] = time.time()
+    data_buffer.append(d)
+    if len(data_buffer) > 300:
+        data_buffer.pop(0)
+    return jsonify({"status":"ok"})
+
+@app.route("/datos")
+def datos():
+    return jsonify(data_buffer)
+
+@app.route("/clear", methods=["POST"])
+def clear_data():
+    data_buffer.clear()
+    return jsonify({"status":"cleared"})
+
+@app.route("/nodos")
+def nodos():
+    nodos = [
+        {"id":"Nodo 1","lat":4.661944,"lng":-74.058583,"variable":"Humedad","bateria":87,"senal":-67,"estado":"OK"},
+        {"id":"Nodo 2","lat":4.662200,"lng":-74.058300,"variable":"Temperatura","bateria":72,"senal":-70,"estado":"OK"},
+        {"id":"Nodo 3","lat":4.661700,"lng":-74.058900,"variable":"Gas","bateria":61,"senal":-75,"estado":"ALERTA"},
+    ]
+    return jsonify(nodos)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000, debug=True)
