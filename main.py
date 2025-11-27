@@ -3,11 +3,21 @@ import time
 
 app = Flask(__name__)
 
-# ===== Buffer de datos (máx 300 entradas) =====
+# ===== BUFFER DE DATOS =====
 data_buffer = []
 
+# ===== SIMULACIÓN INICIAL PARA EVITAR PANTALLA VACÍA =====
+data_buffer.append({
+    "temperatura": 0,
+    "humedad": 0,
+    "gas": 0,
+    "sensorTemp": "offline",
+    "sensorHum": "offline",
+    "sensorGas": "offline",
+    "timestamp": time.time()
+})
 
-# ====== Cargar código fuente en panel ======
+# ===== FUNCION PARA MOSTRAR EL CÓDIGO EN EDITOR =====
 def load_self_code():
     try:
         with open(__file__, "r") as f:
@@ -16,89 +26,54 @@ def load_self_code():
         return "No se pudo cargar el código"
 
 
-# ====== Dashboard HTML ======
+# ============================ HTML UI ============================
 dashboard_html = """
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dashboard Ambiental</title>
-
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-body {
-    font-family: Arial, sans-serif;
-    background: #e9f1ea;
-}
-.container { max-width:1200px; margin:20px auto; padding:10px; }
-
-.chart-title {
-    font-size:20px; font-weight:700; text-align:center; margin-bottom:10px;
-}
-
-.status {
-    font-size:14px; 
-    font-weight:bold;
-    margin-left:10px;
-    padding:4px 8px;
-    border-radius:6px;
-}
-
-.online { color:#0c7a17; background:#b5ffbe; }
-.offline { color:#8b0000; background:#ffc4c4; }
-.waiting { color:#444; background:#d9d9d9; }
-
-.alert-overlay {
-    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
-    background:rgba(200,0,0,0.92);
-    padding:10px 16px; color:white; font-weight:bold;
-    border-radius:10px; display:none; z-index:20; font-size:18px;
-}
-.chart-wrapper { position:relative; width:100%; height:360px; }
-
+body { background:#eef7ef; font-family: Arial; margin:0; }
+.container { width:90%; margin:auto; padding:10px; }
+.chart-title { text-align:center; font-size:22px; font-weight:bold; }
+.status { font-size:14px; padding:5px 10px; border-radius:6px; }
+.online { background:#bfffd1; color:#005f16; }
+.offline { background:#ffd4d4; color:#830000; }
+.waiting { background:#dedede; color:#555; }
+.chart-wrapper { width:100%; height:350px; margin-bottom:25px; }
+.alert { display:none; background:red; color:white; text-align:center; padding:6px; border-radius:6px; font-weight:bold; }
 </style>
 </head>
 
 <body>
 
 <div class="container">
-<h1>Dashboard Ambiental</h1>
+<h1 style="color:#2b6d3e;">Dashboard Ambiental</h1>
 
-<!-- ░░░░░ ESTADOS NODE ░░░░░ -->
-<div class="card">
-    <h2>Estado de Sensores</h2>
-    <p>🌡 Temperatura → <span id="estadoTemp" class="status waiting">⏳ Esperando...</span></p>
-    <p>💧 Humedad → <span id="estadoHum" class="status waiting">⏳ Esperando...</span></p>
-    <p>🔥 Gas → <span id="estadoGas" class="status waiting">⏳ Esperando...</span></p>
+
+<!-- ---------------- ESTADO SENSOR ---------------- -->
+<div style="margin-bottom:20px; font-size:18px;">
+🌡 Temperatura → <span id="estadoTemp" class="status waiting">⏳ Esperando...</span> <br>
+💧 Humedad → <span id="estadoHum" class="status waiting">⏳ Esperando...</span> <br>
+🔥 Gas → <span id="estadoGas" class="status waiting">⏳ Esperando...</span>
 </div>
 
-<!-- ░░░░░ GRAFICAS ░░░░░ -->
 
-<div class="card">
-    <div class="chart-title">Temperatura</div>
-    <div class="chart-wrapper">
-        <div id="alertTemp" class="alert-overlay">⚠ Temperatura crítica</div>
-        <canvas id="tempChart"></canvas>
-    </div>
-</div>
+<!-- ----------------- GRAFICAS ----------------- -->
+<div class="chart-title">Temperatura</div>
+<div id="alertTemp" class="alert">⚠ Temperatura fuera de rango</div>
+<div class="chart-wrapper"><canvas id="tempChart"></canvas></div>
 
-<div class="card">
-    <div class="chart-title">Humedad</div>
-    <div class="chart-wrapper">
-        <div id="alertHum" class="alert-overlay">⚠ Humedad crítica</div>
-        <canvas id="humChart"></canvas>
-    </div>
-</div>
+<div class="chart-title">Humedad</div>
+<div id="alertHum" class="alert">⚠ Humedad fuera de rango</div>
+<div class="chart-wrapper"><canvas id="humChart"></canvas></div>
 
-<div class="card">
-    <div class="chart-title">Gas</div>
-    <div class="chart-wrapper">
-        <div id="alertGas" class="alert-overlay">⚠ Nivel de gas crítico</div>
-        <canvas id="gasChart"></canvas>
-    </div>
-</div>
+<div class="chart-title">Gas</div>
+<div id="alertGas" class="alert">⚠ Nivel crítico de gas</div>
+<div class="chart-wrapper"><canvas id="gasChart"></canvas></div>
 
 
 <script>
@@ -106,89 +81,84 @@ async function fetchDatos(){
     try{
         const res = await fetch('/datos');
         return await res.json();
-    }catch{
-        return [];
-    }
+    }catch{ return []; }
 }
 
-function makeConfig(label){
-    return {
-        type:'line',
-        data:{ labels:[], datasets:[{ label:label, data:[], borderWidth:2 }] },
-        options:{ responsive:true, maintainAspectRatio:false }
-    };
+
+// CONFIG BÁSICA DE GRÁFICO
+function makeConfig(unidad){
+  return {
+    type: 'line',
+    data: { labels: [], datasets:[{ label: unidad, data: [], borderWidth: 2 }] },
+    options: { responsive:true, maintainAspectRatio:false }
+  };
 }
 
-// Graficos
 const tempChart = new Chart(document.getElementById("tempChart"), makeConfig("°C"));
 const humChart  = new Chart(document.getElementById("humChart"),  makeConfig("%"));
 const gasChart  = new Chart(document.getElementById("gasChart"),  makeConfig("ppm"));
 
-// ACTUALIZACIÓN PRINCIPAL
+
+// -------- FUNCIÓN PRINCIPAL --------
 async function actualizarGraficos(){
 
     const datos = await fetchDatos();
+    if(datos.length === 0) return;
 
-    if(datos.length === 0){
-        document.getElementById("estadoTemp").className="status offline";
-        document.getElementById("estadoHum").className="status offline";
-        document.getElementById("estadoGas").className="status offline";
-        document.getElementById("estadoTemp").innerHTML = "Sin datos";
-        document.getElementById("estadoHum").innerHTML = "Sin datos";
-        document.getElementById("estadoGas").innerHTML = "Sin datos";
-        return;
-    }
+    const last = datos[ datos.length-1 ];
 
-    const last = datos[datos.length - 1];
-
-    function actualizarEstado(id, estado){
+    // ---- Actualizar textos de estado ----
+    function setEstado(id, val){
         const el = document.getElementById(id);
-        if(estado === "ok"){
-            el.innerHTML = "🟢 Online";
+        if(val === "ok"){
+            el.innerHTML = "🟢 Conectado";
             el.className = "status online";
-        }else{
-            el.innerHTML = "🔴 Offline";
+        } else {
+            el.innerHTML = "🔴 Desconectado";
             el.className = "status offline";
         }
     }
 
-    actualizarEstado("estadoTemp", last.sensorTemp);
-    actualizarEstado("estadoHum",  last.sensorHum);
-    actualizarEstado("estadoGas",  last.sensorGas);
+    setEstado("estadoTemp", last.sensorTemp);
+    setEstado("estadoHum",  last.sensorHum);
+    setEstado("estadoGas",  last.sensorGas);
 
+    // --- Filtrar valores válidos (ignorar -1) ---
     const labels = datos.map(d => new Date(d.timestamp * 1000).toLocaleTimeString());
 
     tempChart.data.labels = labels;
-    tempChart.data.datasets[0].data = datos.map(d => d.temperatura);
+    tempChart.data.datasets[0].data = datos.map(d => d.temperatura === -1 ? null : d.temperatura);
 
     humChart.data.labels = labels;
-    humChart.data.datasets[0].data = datos.map(d => d.humedad);
+    humChart.data.datasets[0].data = datos.map(d => d.humedad === -1 ? null : d.humedad);
 
     gasChart.data.labels = labels;
-    gasChart.data.datasets[0].data = datos.map(d => d.gas);
+    gasChart.data.datasets[0].data = datos.map(d => d.gas === -1 ? null : d.gas);
 
     tempChart.update(); humChart.update(); gasChart.update();
 
+
+    // ---- ALERTAS (campo offline encendido también alerta) ----
     document.getElementById("alertTemp").style.display = 
-      (last.sensorTemp === "offline") ? "block" : "none";
+        (last.sensorTemp === "offline") ? "block":"none";
 
     document.getElementById("alertHum").style.display = 
-      (last.sensorHum === "offline") ? "block" : "none";
+        (last.sensorHum === "offline") ? "block":"none";
 
     document.getElementById("alertGas").style.display = 
-      (last.sensorGas === "offline") ? "block" : "none";
+        (last.sensorGas === "offline") ? "block":"none";
 }
 
-setInterval(actualizarGraficos, 3000);
+setInterval(actualizarGraficos, 2000);
 actualizarGraficos();
-
 </script>
+
 </body>
 </html>
 """
 
 
-# ========= RUTAS FLASK =========
+# ---------------------- RUTAS ----------------------
 
 @app.route("/")
 def home():
@@ -199,15 +169,15 @@ def home():
 def receive_data():
     d = request.get_json()
     if not d:
-        return jsonify({"status": "error"}), 400
+        return jsonify({"status":"error"}),400
 
     d["timestamp"] = time.time()
     data_buffer.append(d)
 
-    if len(data_buffer) > 300:
+    if len(data_buffer)>300:
         data_buffer.pop(0)
 
-    return jsonify({"status": "ok"})
+    return jsonify({"status":"ok"})
 
 
 @app.route("/datos")
@@ -218,9 +188,9 @@ def datos():
 @app.route("/clear", methods=["POST"])
 def clear_data():
     data_buffer.clear()
-    return jsonify({"status": "cleared"})
+    return jsonify({"status":"cleared"})
 
 
-# ========= MAIN =========
+# ------------------ MAIN ------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000, debug=True)
