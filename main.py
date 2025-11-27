@@ -5,7 +5,7 @@ app = Flask(__name__)
 
 data_buffer = []
 last_update = 0
-gateway_timeout = 8  # segundos para detectar desconexión
+gateway_timeout = 8  # segundos para detectar desconexión del gateway
 
 dashboard_html = """
 <!DOCTYPE html>
@@ -34,12 +34,20 @@ body{
 
 .chart-wrapper{
     width:100%;
-    height:550px;
-    margin:50px 0;
+    height:700px; /* más grande */
+    margin:60px 0;
     background:white;
-    padding:25px;
-    border-radius:12px;
-    box-shadow:0 6px 15px rgba(0,0,0,0.1);
+    padding:35px;
+    border-radius:14px;
+    box-shadow:0 6px 20px rgba(0,0,0,0.15);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+canvas {
+    width:100% !important;
+    height:100% !important;
 }
 
 .btn{
@@ -69,9 +77,9 @@ body{
 
 <div id="map" style="height:400px;margin-top:20px;border-radius:10px;"></div>
 
-<div class="chart-wrapper"><center><h2>Temperatura</h2></center><canvas id="tempChart"></canvas></div>
-<div class="chart-wrapper"><center><h2>Humedad</h2></center><canvas id="humChart"></canvas></div>
-<div class="chart-wrapper"><center><h2>Gas</h2></center><canvas id="gasChart"></canvas></div>
+<div class="chart-wrapper"><canvas id="tempChart"></canvas></div>
+<div class="chart-wrapper"><canvas id="humChart"></canvas></div>
+<div class="chart-wrapper"><canvas id="gasChart"></canvas></div>
 
 
 <script>
